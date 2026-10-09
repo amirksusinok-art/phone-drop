@@ -70,13 +70,44 @@ async function authenticate(req, res, next) {
     let user = await db.queryOne('SELECT * FROM users WHERE telegram_id = ?', [tgIdStr]);
 
     if (!user) {
-      // Регистрация нового игрока: 250 Coins стартовый баланс, 50 слотов
+      // Проверка реферального кода: ref_{telegram_id}
+      let referrerId = null;
+      let startCoins = 250;
+      const startParam = req.headers['x-start-param'] || '';
+
+      if (startParam.startsWith('ref_')) {
+        const refTgId = startParam.replace('ref_', '').trim();
+        if (refTgId && refTgId !== tgIdStr) {
+          const referrer = await db.queryOne('SELECT id, telegram_id FROM users WHERE telegram_id = ?', [refTgId]);
+          if (referrer) {
+            referrerId = referrer.id;
+            startCoins = 350; // +100 Coins бонус новичку
+
+            // Начисляем рефереру +150 Coins
+            await db.run(
+              'UPDATE users SET coins = coins + 150, referral_earnings = referral_earnings + 150 WHERE id = ?',
+              [referrer.id]
+            );
+          }
+        }
+      }
+
+      // Регистрация нового игрока
       await db.run(
-        `INSERT INTO users (telegram_id, username, first_name, avatar_url, coins, max_inventory)
-         VALUES (?, ?, ?, ?, 250, 50)`,
-        [tgIdStr, telegramUser.username || '', telegramUser.first_name || 'Игрок', telegramUser.photo_url || '']
+        `INSERT INTO users (telegram_id, username, first_name, avatar_url, coins, max_inventory, referrer_id)
+         VALUES (?, ?, ?, ?, ?, 50, ?)`,
+        [tgIdStr, telegramUser.username || '', telegramUser.first_name || 'Игрок', telegramUser.photo_url || '', startCoins, referrerId]
       );
       user = await db.queryOne('SELECT * FROM users WHERE telegram_id = ?', [tgIdStr]);
+
+      if (referrerId) {
+        try {
+          await db.run(
+            'INSERT INTO referrals (referrer_id, referred_id, bonus_coins) VALUES (?, ?, 150)',
+            [referrerId, user.id]
+          );
+        } catch {}
+      }
     }
 
     req.user = user;
@@ -907,6 +938,201 @@ router.post('/user/equip-cosmetic', authenticate, async (req, res) => {
   }
 
   res.json({ success: true, equipped: itemId });
+});
+
+/* -------------------------------------------------------------
+ * 10. РЕФЕРАЛЬНАЯ СИСТЕМА (ДРУЗЬЯ)
+ * ------------------------------------------------------------- */
+router.get('/referrals', authenticate, async (req, res) => {
+  const user = req.user;
+  const botUsername = process.env.BOT_USERNAME || 'phonedrop_bot';
+  const referralLink = `https://t.me/${botUsername}?start=ref_${user.telegram_id}`;
+
+  const friends = await db.query(`
+    SELECT r.id, r.bonus_coins, r.created_at,
+           u.first_name, u.username, u.avatar_url
+    FROM referrals r
+    JOIN users u ON r.referred_id = u.id
+    WHERE r.referrer_id = ?
+    ORDER BY r.created_at DESC
+  `, [user.id]);
+
+  const freshUser = await db.queryOne('SELECT referral_earnings FROM users WHERE id = ?', [user.id]);
+
+  res.json({
+    referralLink,
+    telegramId: user.telegram_id,
+    totalEarnings: freshUser?.referral_earnings || 0,
+    friendsCount: friends.length,
+    friends
+  });
+});
+
+/* -------------------------------------------------------------
+ * 11. КРАФТ НОМЕРОВ (LUCKY FUSION 5 в 1)
+ * ------------------------------------------------------------- */
+const CRAFT_TIERS = {
+  common: { next: 'uncommon', lucky: 'rare', luckyChance: 0.10 },
+  uncommon: { next: 'rare', lucky: 'epic', luckyChance: 0.10 },
+  rare: { next: 'epic', lucky: 'legendary', luckyChance: 0.10 },
+  epic: { next: 'legendary', lucky: 'mythic', luckyChance: 0.10 }
+};
+
+router.post('/craft/fuse', authenticate, async (req, res) => {
+  const { phoneIds } = req.body;
+  const user = req.user;
+
+  if (!Array.isArray(phoneIds) || phoneIds.length !== 5) {
+    return res.status(400).json({ error: 'Для обмена необходимо выбрать ровно 5 номеров' });
+  }
+
+  const uniqueIds = [...new Set(phoneIds)];
+  if (uniqueIds.length !== 5) {
+    return res.status(400).json({ error: 'Номера в контракте должны быть уникальными' });
+  }
+
+  const phones = await db.query(`
+    SELECT * FROM phones WHERE id IN (?, ?, ?, ?, ?) AND owner_id = ? AND status = 'owned'
+  `, [...uniqueIds, user.id]);
+
+  if (phones.length !== 5) {
+    return res.status(400).json({ error: 'Все 5 номеров должны принадлежать вам и не быть выставлены на рынок' });
+  }
+
+  const baseRarity = phones[0].rarity;
+  const allSameRarity = phones.every(p => p.rarity === baseRarity);
+  if (!allSameRarity) {
+    return res.status(400).json({ error: 'Все 5 номеров должны быть одной редкости' });
+  }
+
+  const craftRule = CRAFT_TIERS[baseRarity];
+  if (!craftRule) {
+    return res.status(400).json({ error: 'Номера мифической редкости нельзя использовать в синтезе' });
+  }
+
+  const isLuckyRoll = Math.random() < craftRule.luckyChance;
+  const targetRarity = isLuckyRoll ? craftRule.lucky : craftRule.next;
+
+  let resultPhone = await db.queryOne(`
+    SELECT * FROM phones WHERE status = 'available' AND rarity = ? ORDER BY RANDOM() LIMIT 1
+  `, [targetRarity]);
+
+  if (!resultPhone && isLuckyRoll) {
+    resultPhone = await db.queryOne(`
+      SELECT * FROM phones WHERE status = 'available' AND rarity = ? ORDER BY RANDOM() LIMIT 1
+    `, [craftRule.next]);
+  }
+
+  if (!resultPhone) {
+    return res.status(400).json({ error: 'В свободном пуле временно закончились номера для синтеза' });
+  }
+
+  if (!db.isPostgres) {
+    const tx = db.sqliteDb.transaction(() => {
+      for (const p of phones) {
+        db.sqliteDb.prepare("UPDATE phones SET status = 'available', owner_id = NULL WHERE id = ?").run(p.id);
+        db.sqliteDb.prepare("INSERT INTO phone_history (phone_id, event_type, from_user_id) VALUES (?, 'craft_burn', ?)").run(p.id, user.id);
+        db.sqliteDb.prepare("UPDATE users SET equipped_phone_id = NULL WHERE id = ? AND equipped_phone_id = ?").run(user.id, p.id);
+      }
+
+      db.sqliteDb.prepare(`
+        UPDATE phones 
+        SET status = 'owned', 
+            owner_id = ?,
+            first_discovered_at = COALESCE(first_discovered_at, CURRENT_TIMESTAMP),
+            first_owner_id = COALESCE(first_owner_id, ?)
+        WHERE id = ?
+      `).run(user.id, user.id, resultPhone.id);
+
+      db.sqliteDb.prepare("INSERT INTO phone_history (phone_id, event_type, to_user_id) VALUES (?, 'craft_result', ?)").run(resultPhone.id, user.id);
+    });
+    tx();
+  } else {
+    for (const p of phones) {
+      await db.run("UPDATE phones SET status = 'available', owner_id = NULL WHERE id = ?", [p.id]);
+      await db.run("INSERT INTO phone_history (phone_id, event_type, from_user_id) VALUES (?, 'craft_burn', ?)", [p.id, user.id]);
+      await db.run("UPDATE users SET equipped_phone_id = NULL WHERE id = ? AND equipped_phone_id = ?", [user.id, p.id]);
+    }
+    await db.run(`
+      UPDATE phones 
+      SET status = 'owned', 
+          owner_id = ?,
+          first_discovered_at = COALESCE(first_discovered_at, NOW()),
+          first_owner_id = COALESCE(first_owner_id, ?)
+      WHERE id = ?
+    `, [user.id, user.id, resultPhone.id]);
+    await db.run("INSERT INTO phone_history (phone_id, event_type, to_user_id) VALUES (?, 'craft_result', ?)", [resultPhone.id, user.id]);
+  }
+
+  const finalPhone = await db.queryOne('SELECT * FROM phones WHERE id = ?', [resultPhone.id]);
+
+  res.json({
+    success: true,
+    phone: finalPhone,
+    isLuckyUpgrade: isLuckyRoll && finalPhone.rarity === craftRule.lucky
+  });
+});
+
+/* -------------------------------------------------------------
+ * 12. TELEGRAM STARS (МОНЕТИЗАЦИЯ)
+ * ------------------------------------------------------------- */
+const STARS_PACKAGES = [
+  { id: 'pack_10', stars: 10, coins: 1000, title: '1 000 Coins', description: 'Стартовый набор для открытий' },
+  { id: 'pack_30', stars: 30, coins: 5000, title: '5 000 Coins', description: 'Популярный набор коллекционера' },
+  { id: 'pack_50', stars: 50, coins: 25000, title: '25 000 Coins', description: 'Супер-выгода для элитных кейсов' }
+];
+
+router.get('/stars/packages', (req, res) => {
+  res.json({ packages: STARS_PACKAGES });
+});
+
+router.post('/stars/buy', authenticate, async (req, res) => {
+  const { packageId } = req.body;
+  const user = req.user;
+
+  const pkg = STARS_PACKAGES.find(p => p.id === packageId);
+  if (!pkg) {
+    return res.status(400).json({ error: 'Пакет не найден' });
+  }
+
+  const initData = req.headers['x-telegram-init-data'];
+  if (initData && BOT_TOKEN) {
+    try {
+      const resp = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${pkg.coins.toLocaleString()} Coins`,
+          description: pkg.description,
+          payload: JSON.stringify({ userId: user.id, pkgId: pkg.id, coins: pkg.coins }),
+          currency: 'XTR',
+          prices: [{ label: `${pkg.coins.toLocaleString()} Coins`, amount: pkg.stars }]
+        })
+      });
+      const data = await resp.json();
+      if (data.ok && data.result) {
+        return res.json({ success: true, invoiceLink: data.result });
+      }
+    } catch (err) {
+      console.error('[Stars Error]:', err);
+    }
+  }
+
+  // Demo fallback
+  await db.run('UPDATE users SET coins = coins + ? WHERE id = ?', [pkg.coins, user.id]);
+  await db.run('INSERT INTO stars_orders (user_id, stars_amount, coins_amount, status) VALUES (?, ?, ?, ?)', [
+    user.id, pkg.stars, pkg.coins, 'completed'
+  ]);
+
+  const updatedUser = await db.queryOne('SELECT coins FROM users WHERE id = ?', [user.id]);
+
+  res.json({
+    success: true,
+    isDemo: true,
+    coinsAdded: pkg.coins,
+    newBalance: updatedUser.coins,
+    message: `Успешно начислено +${pkg.coins.toLocaleString()} Coins!`
+  });
 });
 
 module.exports = router;

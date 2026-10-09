@@ -36,12 +36,22 @@ export async function apiRequest(endpoint, options = {}) {
   const tg = window.Telegram?.WebApp;
   if (tg?.initData) {
     headers['x-telegram-init-data'] = tg.initData;
+    if (tg.initDataUnsafe?.start_param) {
+      headers['x-start-param'] = tg.initDataUnsafe.start_param;
+    }
   } else {
     // Режим браузера (Demo / Dev)
     const demo = getDemoUser();
     headers['x-demo-user-id'] = demo.id;
     headers['x-demo-name'] = demo.name;
     headers['x-demo-username'] = demo.username;
+
+    // Реферальный параметр из URL (?start=ref_xxx или ?ref=xxx)
+    const params = new URLSearchParams(window.location.search);
+    const startParam = params.get('start') || params.get('startapp') || params.get('ref');
+    if (startParam) {
+      headers['x-start-param'] = startParam.startsWith('ref_') ? startParam : `ref_${startParam}`;
+    }
   }
 
   const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -67,6 +77,16 @@ export const api = {
   buyCosmetic: (itemId) => apiRequest('/user/buy-cosmetic', { method: 'POST', body: JSON.stringify({ itemId }) }),
   equipCosmetic: (type, itemId) => apiRequest('/user/equip-cosmetic', { method: 'POST', body: JSON.stringify({ type, itemId }) }),
   getCosmetics: () => apiRequest('/cosmetics'),
+
+  // Рефералы
+  getReferrals: () => apiRequest('/referrals'),
+
+  // Крафт (Контракт обмена 5 в 1)
+  fuseCraft: (phoneIds) => apiRequest('/craft/fuse', { method: 'POST', body: JSON.stringify({ phoneIds }) }),
+
+  // Telegram Stars
+  getStarsPackages: () => apiRequest('/stars/packages'),
+  buyStars: (packageId) => apiRequest('/stars/buy', { method: 'POST', body: JSON.stringify({ packageId }) }),
 
   // Кейсы
   getCasesInfo: () => apiRequest('/cases/info'),

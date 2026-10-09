@@ -81,6 +81,8 @@ async function initSchema() {
       equipped_phone_id INTEGER,
       avatar_frame TEXT NOT NULL DEFAULT 'default',
       profile_bg TEXT NOT NULL DEFAULT 'default',
+      referrer_id INTEGER,
+      referral_earnings INTEGER NOT NULL DEFAULT 0,
       is_public INTEGER NOT NULL DEFAULT 1,
       created_at ${isPg ? 'TIMESTAMPTZ DEFAULT NOW()' : 'DATETIME DEFAULT CURRENT_TIMESTAMP'}
     )
@@ -143,6 +145,28 @@ async function initSchema() {
     )
   `;
 
+  const createReferralsTable = `
+    CREATE TABLE IF NOT EXISTS referrals (
+      id ${isPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      referrer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      referred_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      bonus_coins INTEGER NOT NULL DEFAULT 150,
+      created_at ${isPg ? 'TIMESTAMPTZ DEFAULT NOW()' : 'DATETIME DEFAULT CURRENT_TIMESTAMP'},
+      UNIQUE(referred_id)
+    )
+  `;
+
+  const createStarsOrdersTable = `
+    CREATE TABLE IF NOT EXISTS stars_orders (
+      id ${isPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      stars_amount INTEGER NOT NULL,
+      coins_amount INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'completed',
+      created_at ${isPg ? 'TIMESTAMPTZ DEFAULT NOW()' : 'DATETIME DEFAULT CURRENT_TIMESTAMP'}
+    )
+  `;
+
   const createOperationsLogTable = `
     CREATE TABLE IF NOT EXISTS operations_log (
       id ${isPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
@@ -160,6 +184,8 @@ async function initSchema() {
     await pgPool.query(createPhoneHistoryTable);
     await pgPool.query(createMarketListingsTable);
     await pgPool.query(createCosmeticsTable);
+    await pgPool.query(createReferralsTable);
+    await pgPool.query(createStarsOrdersTable);
     await pgPool.query(createOperationsLogTable);
   } else {
     sqliteDb.exec(createUsersTable);
@@ -167,7 +193,17 @@ async function initSchema() {
     sqliteDb.exec(createPhoneHistoryTable);
     sqliteDb.exec(createMarketListingsTable);
     sqliteDb.exec(createCosmeticsTable);
+    sqliteDb.exec(createReferralsTable);
+    sqliteDb.exec(createStarsOrdersTable);
     sqliteDb.exec(createOperationsLogTable);
+
+    // Добавляем недостающие колонки в существующие таблицы, если база уже создана
+    try {
+      sqliteDb.exec('ALTER TABLE users ADD COLUMN referrer_id INTEGER');
+    } catch {}
+    try {
+      sqliteDb.exec('ALTER TABLE users ADD COLUMN referral_earnings INTEGER NOT NULL DEFAULT 0');
+    } catch {}
   }
 
   console.log('[DB] Структура базы данных проверена и готова.');

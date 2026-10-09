@@ -1,45 +1,49 @@
 // client/src/components/WarningModal.jsx
 import React from 'react';
-import { ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, Check } from 'lucide-react';
+import { haptic } from '../haptic';
 
 export default function WarningModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-md bg-[#111726] border border-amber-500/40 rounded-2xl p-6 shadow-2xl text-slate-200">
-        <div className="flex items-center gap-3 text-amber-400 mb-4">
-          <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/30">
-            <ShieldAlert className="w-7 h-7" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="relative w-full max-w-sm bg-[var(--tg-theme-bg-color,#0f172a)] border border-amber-400/30 rounded-2xl p-5 shadow-xl text-[var(--tg-theme-text-color,#f8fafc)]">
+        <div className="flex items-center gap-2.5 mb-3.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center">
+            <ShieldAlert className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white tracking-wide">
+            <h2 className="text-sm font-bold text-white">
               Игровые телефонные номера
             </h2>
-            <p className="text-xs text-amber-400/80">Официальное предупреждение</p>
+            <p className="text-[11px] text-[var(--tg-theme-hint-color,#94a3b8)]">Официальное предупреждение</p>
           </div>
         </div>
 
-        <div className="space-y-3 text-sm leading-relaxed text-slate-300 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+        <div className="space-y-2.5 text-xs leading-relaxed text-slate-300 bg-[var(--tg-theme-secondary-bg-color,#1e293b)] p-3.5 rounded-xl border border-white/5">
           <p>
             Все номера в <strong>Phone Drop</strong> предназначены исключительно для коллекционирования внутри игры.
           </p>
-          <p className="text-amber-200/90 font-medium">
+          <p className="text-amber-300 font-medium">
             ⚠️ Не звоните и не отправляйте сообщения на отображаемые номера.
           </p>
           <p>
-            Некоторые цифровые комбинации могут совпадать с номерами реальных людей. Игра не подтверждает, что отображаемые цифры никому не принадлежат.
+            Некоторые цифровые комбинации могут случайно совпадать с номерами реальных абонентов. Игра не подтверждает, что номера никому не принадлежат.
           </p>
-          <p className="text-xs text-slate-400">
-            Используйте номера только как игровые предметы. Уважайте конфиденциальность других людей.
+          <p className="text-[11px] text-[var(--tg-theme-hint-color,#94a3b8)]">
+            Используйте номера исключительно как виртуальные игровые предметы. Уважайте конфиденциальность других людей.
           </p>
         </div>
 
         <button
-          onClick={onClose}
-          className="mt-6 w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl transition duration-200 shadow-lg shadow-amber-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+          onClick={() => {
+            haptic.notification('success');
+            onClose();
+          }}
+          className="mt-4 w-full py-2.5 px-4 bg-[var(--tg-theme-button-color,#0284c7)] text-[var(--tg-theme-button-text-color,#ffffff)] font-medium text-xs rounded-xl transition active:scale-[0.98] flex items-center justify-center gap-1.5"
         >
-          <CheckCircle2 className="w-5 h-5" />
+          <Check className="w-4 h-4" />
           Понятно
         </button>
       </div>
