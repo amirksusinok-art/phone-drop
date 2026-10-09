@@ -1,0 +1,31 @@
+{
+  "name": "phone-drop",
+  "version": "1.0.0",
+  "description": "Phone Drop — коллекционная мини-игра Telegram Mini App с виртуальной экономикой и рынком номеров",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "build": "npm --prefix client install && npm --prefix client run build",
+    "dev:server": "node server/server.js",
+    "dev:client": "npm --prefix client run dev"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "telegram-mini-app",
+    "game",
+    "collectibles",
+    "phone-numbers",
+    "virtual-economy"
+  ],
+  "author": "Phone Drop Team",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.6",
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
+  }
+}

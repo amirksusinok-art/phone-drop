@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-primary: #090d16;
+    --bg-card: #111726;
+    --bg-surface: #182033;
+  }
+
+  body {
+    background-color: #080c15;
+    color: #f1f5f9;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+.font-mono-numbers {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5);
+  border-radius: 4px;
+}
+
+/* Rarity Glowing effects */
+.glow-common {
+  box-shadow: 0 0 15px -3px rgba(148, 163, 184, 0.2);
+}
+.glow-uncommon {
+  box-shadow: 0 0 20px -3px rgba(34, 197, 94, 0.3);
+}
+.glow-rare {
+  box-shadow: 0 0 22px -3px rgba(59, 130, 246, 0.35);
+}
+.glow-epic {
+  box-shadow: 0 0 25px -3px rgba(168, 85, 247, 0.45);
+}
+.glow-legendary {
+  box-shadow: 0 0 30px -2px rgba(234, 179, 8, 0.55);
+}
+.glow-mythic {
+  box-shadow: 0 0 35px 2px rgba(236, 72, 153, 0.65), 0 0 50px -5px rgba(168, 85, 247, 0.5);
+  animation: mythic-pulse 2.5s infinite alternate ease-in-out;
+}
+
+@keyframes mythic-pulse {
+  0% {
+    box-shadow: 0 0 25px 2px rgba(236, 72, 153, 0.5), 0 0 40px -5px rgba(168, 85, 247, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 45px 6px rgba(236, 72, 153, 0.8), 0 0 65px 2px rgba(99, 102, 241, 0.6);
+  }
+}
+
+@keyframes drop-reveal {
+  0% {
+    transform: scale(0.7) translateY(20px);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-drop-reveal {
+  animation: drop-reveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
