@@ -15,6 +15,8 @@ import MarketView from './views/MarketView';
 import LeaderboardView from './views/LeaderboardView';
 import ProfileView from './views/ProfileView';
 
+import { haptic } from './haptic';
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,9 +32,13 @@ export default function App() {
   // Инициализация Telegram Mini App и пользователя
   const initApp = async () => {
     try {
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand();
+      const tg = window.Telegram?.WebApp;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+        tg.setHeaderColor?.('#090d16');
+        tg.setBackgroundColor?.('#080c15');
+        tg.enableClosingConfirmation?.();
       }
 
       // Проверка первого запуска (предупреждение)
@@ -160,7 +166,10 @@ export default function App() {
       {/* Нижняя панель навигации */}
       <BottomNav
         activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
+        onTabChange={(tab) => {
+          haptic.selection();
+          setActiveTab(tab);
+        }}
       />
 
       {/* Модальные окна */}

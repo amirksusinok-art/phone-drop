@@ -5,6 +5,8 @@ import { Sparkles, Coins, Flame, Award, Globe, Shield, RefreshCw, Check, ArrowRi
 import { api } from '../api';
 import PhoneCard, { RARITY_STYLES } from '../components/PhoneCard';
 
+import { haptic } from '../haptic';
+
 const COUNTRIES_LIST = [
   { key: 'RU', name: 'Россия', flag: '🇷🇺' },
   { key: 'UA', name: 'Украина', flag: '🇺🇦' },
@@ -37,9 +39,13 @@ export default function DropView({ user, onUpdateUser, onEquipPhone, onOpenDetai
     setErrorMsg('');
     setDroppedPhone(null);
     setIsOpening(true);
+    haptic.impact('heavy');
 
     // Анимация быстрой смены цифр (рулетка)
+    let ticks = 0;
     const interval = setInterval(() => {
+      ticks++;
+      if (ticks % 3 === 0) haptic.impact('light');
       const chars = '0123456789';
       let rand = '+? (';
       for (let i = 0; i < 3; i++) rand += chars[Math.floor(Math.random() * chars.length)];
@@ -64,6 +70,7 @@ export default function DropView({ user, onUpdateUser, onEquipPhone, onOpenDetai
         setIsOpening(false);
         setDroppedPhone(res.phone);
         setIsFirstDiscovery(res.isFirstDiscovery);
+        haptic.notification('success');
         onUpdateUser();
         loadCases();
 
@@ -79,6 +86,7 @@ export default function DropView({ user, onUpdateUser, onEquipPhone, onOpenDetai
     } catch (err) {
       clearInterval(interval);
       setIsOpening(false);
+      haptic.notification('error');
       setErrorMsg(err.message || 'Ошибка открытия кейса');
     }
   };
