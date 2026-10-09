@@ -36,22 +36,36 @@ export async function apiRequest(endpoint, options = {}) {
   const tg = window.Telegram?.WebApp;
   if (tg?.initData) {
     headers['x-telegram-init-data'] = tg.initData;
-    if (tg.initDataUnsafe?.start_param) {
-      headers['x-start-param'] = tg.initDataUnsafe.start_param;
-    }
   } else {
     // Режим браузера (Demo / Dev)
     const demo = getDemoUser();
     headers['x-demo-user-id'] = demo.id;
     headers['x-demo-name'] = demo.name;
     headers['x-demo-username'] = demo.username;
+  }
 
-    // Реферальный параметр из URL (?start=ref_xxx или ?ref=xxx)
-    const params = new URLSearchParams(window.location.search);
-    const startParam = params.get('start') || params.get('startapp') || params.get('ref');
-    if (startParam) {
-      headers['x-start-param'] = startParam.startsWith('ref_') ? startParam : `ref_${startParam}`;
-    }
+  // Обнаружение реферального параметра из всех источников
+  let startParam = tg?.initDataUnsafe?.start_param || '';
+  if (!startParam) {
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    startParam = searchParams.get('startapp') ||
+                 searchParams.get('start') ||
+                 searchParams.get('ref') ||
+                 searchParams.get('tgWebAppStartParam') ||
+                 hashParams.get('tgWebAppStartParam') ||
+                 hashParams.get('start_param') ||
+                 '';
+  }
+
+  if (startParam) {
+    try { sessionStorage.setItem('phone_drop_ref_param', startParam); } catch {}
+  } else {
+    try { startParam = sessionStorage.getItem('phone_drop_ref_param') || ''; } catch {}
+  }
+
+  if (startParam) {
+    headers['x-start-param'] = startParam.startsWith('ref_') ? startParam : `ref_${startParam}`;
   }
 
   const res = await fetch(`${API_BASE}${endpoint}`, {

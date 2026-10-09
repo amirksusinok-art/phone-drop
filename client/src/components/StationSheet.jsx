@@ -20,6 +20,15 @@ export default function StationSheet({
   const pendingTapsRef = useRef({ count: 0, luckyHits: 0 });
   const syncTimeoutRef = useRef(null);
 
+  // Скрываем нативную MainButton Telegram, чтобы она не перекрывала шторку!
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.MainButton) return;
+    if (isOpen) {
+      tg.MainButton.hide();
+    }
+  }, [isOpen]);
+
   // Загрузка начального статуса энергии
   useEffect(() => {
     if (!isOpen) return;
@@ -69,18 +78,18 @@ export default function StationSheet({
   const handleTap = (e) => {
     if (energy <= 0) {
       haptic.notification('error');
-      showToast('Энергия исчерпана! Она восстанавливается со временем.', 'info');
+      showToast('Энергия исчерпана! Восстанавливается со временем.', 'info');
       return;
     }
 
-    // 1% шанс на "Счастливый сигнал"
+    // 1% шанс на "Счастливый сигнал" (+25 Coins)
     const isLucky = Math.random() < 0.01;
     const coinsToAdd = isLucky ? 25 : 1;
 
     if (isLucky) {
       haptic.notification('success');
       setIsLuckyBurst(true);
-      setTimeout(() => setIsLuckyBurst(false), 800);
+      setTimeout(() => setIsLuckyBurst(false), 900);
       showToast('🍀 Счастливый сигнал! +25 Coins', 'success');
     } else {
       haptic.impact('light');
@@ -88,7 +97,7 @@ export default function StationSheet({
 
     // Микро-анимация сжатия кнопки
     setTapScale(true);
-    setTimeout(() => setTapScale(false), 80);
+    setTimeout(() => setTapScale(false), 90);
 
     // Списание энергии и добавление в очередь
     setEnergy(prev => Math.max(0, prev - 1));
@@ -118,14 +127,14 @@ export default function StationSheet({
   const energyPercent = Math.round((energy / maxEnergy) * 100);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-xs">
       <div className="w-full max-w-md mx-auto bg-[var(--tg-theme-bg-color,#0f172a)] border-t border-white/10 rounded-t-3xl p-5 shadow-2xl flex flex-col space-y-4 animate-in slide-in-from-bottom duration-200">
         
         {/* Ручка свайпа и заголовок */}
         <div className="flex flex-col items-center">
           <div className="w-10 h-1 rounded-full bg-white/20 mb-3" />
           <div className="w-full flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center">
                 <Radio className="w-4 h-4 animate-pulse" />
               </div>
@@ -170,46 +179,69 @@ export default function StationSheet({
           </div>
         </div>
 
-        {/* Интерактивный телефонный диск / центральная станция пинга */}
-        <div className="py-6 flex flex-col items-center justify-center relative select-none">
+        {/* Интерактивный винтажный телефонный коммуникатор */}
+        <div className="py-4 flex flex-col items-center justify-center relative select-none">
           {/* Концентрические кольца сигнала */}
-          <div className="absolute w-56 h-56 rounded-full border border-sky-500/10 animate-ping pointer-events-none" style={{ animationDuration: '3s' }} />
-          <div className="absolute w-44 h-44 rounded-full border border-sky-500/15 pointer-events-none" />
+          <div
+            className="absolute w-60 h-60 rounded-full border border-sky-500/10 animate-ping pointer-events-none"
+            style={{ animationDuration: '3s' }}
+          />
+          <div className="absolute w-48 h-48 rounded-full border border-sky-500/15 pointer-events-none" />
 
-          {/* Интерактивная круглая кнопка диска */}
+          {/* Интерактивная круглая кнопка с 3D-артом коммуникатора */}
           <button
             onClick={handleTap}
             disabled={energy <= 0}
-            className={`relative w-36 h-36 rounded-full bg-gradient-to-b from-[var(--tg-theme-secondary-bg-color,#1e293b)] to-[#090d16] border-2 flex flex-col items-center justify-center transition-transform shadow-xl ${
-              isLuckyBurst ? 'border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.5)]' : 'border-sky-500/30'
-            } ${tapScale ? 'scale-95' : 'scale-100'} active:scale-95`}
+            className={`relative w-44 h-44 rounded-3xl overflow-hidden border-2 transition-transform duration-100 shadow-2xl flex items-center justify-center ${
+              isLuckyBurst
+                ? 'border-amber-400 ring-4 ring-amber-400/40 shadow-[0_0_25px_rgba(251,191,36,0.6)]'
+                : 'border-sky-500/40 ring-2 ring-sky-500/20'
+            } ${tapScale ? 'scale-90' : 'scale-100'} active:scale-90`}
           >
-            <div className="w-12 h-12 rounded-2xl bg-sky-500/10 flex items-center justify-center text-sky-400 mb-1">
-              <PhoneCall className="w-6 h-6 stroke-[1.8]" />
+            {/* Изображение спутникового коммуникатора */}
+            <img
+              src="/station_dial.jpg"
+              alt="Станция связи"
+              className="w-full h-full object-cover pointer-events-none select-none transition-transform duration-200"
+              style={{ filter: energy <= 0 ? 'grayscale(80%) brightness(0.6)' : 'none' }}
+            />
+
+            {/* Внутренняя легкая градиентная маска */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+
+            {/* Центральный бейдж ПИНГ */}
+            <div className="absolute bottom-2.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center gap-1.5 shadow-md">
+              <span className="text-[10px] font-bold text-white tracking-wider uppercase">ПИНГ</span>
+              <span className="text-[9px] font-mono font-semibold text-amber-300">-1 ⚡</span>
             </div>
-            <span className="text-xs font-bold text-white tracking-wide">
-              ПИНГ
-            </span>
-            <span className="text-[10px] text-[var(--tg-theme-hint-color,#94a3b8)] font-mono">
-              -1 ⚡
-            </span>
+
+            {/* Оверлей при 0 энергии */}
+            {energy <= 0 && (
+              <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center text-center p-2">
+                <Zap className="w-6 h-6 text-slate-500 mb-1" />
+                <span className="text-xs font-semibold text-slate-300">Зарядка...</span>
+                <span className="text-[10px] text-slate-400">+1 в 3 сек</span>
+              </div>
+            )}
 
             {/* Всплывающие цифры при кликах */}
             {floatingTexts.map(item => (
               <span
                 key={item.id}
-                className={`absolute pointer-events-none font-number font-extrabold text-sm animate-out fade-out slide-out-to-top duration-700 ${
-                  item.isLucky ? 'text-amber-300 text-base scale-110 drop-shadow-md' : 'text-sky-300'
+                className={`absolute pointer-events-none font-number font-extrabold text-base animate-out fade-out slide-out-to-top duration-700 ${
+                  item.isLucky
+                    ? 'text-amber-300 text-lg scale-125 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]'
+                    : 'text-sky-300 drop-shadow-md'
                 }`}
-                style={{ top: `${item.y - 20}px`, left: `${item.x}px` }}
+                style={{ top: `${item.y - 15}px`, left: `${item.x}px` }}
               >
                 {item.text}
               </span>
             ))}
           </button>
 
-          <p className="text-[11px] text-[var(--tg-theme-hint-color,#94a3b8)] mt-5 text-center max-w-xs">
-            Тапай по диску связи. Шанс 1% поймать <strong className="text-amber-300">«Счастливый сигнал» (+25 C)</strong>.
+          <p className="text-[11px] text-[var(--tg-theme-hint-color,#94a3b8)] mt-4 text-center max-w-xs">
+            Тапай по станции связи. Шанс 1% поймать <strong className="text-amber-300">«Счастливый сигнал» (+25 C)</strong>.
           </p>
         </div>
 

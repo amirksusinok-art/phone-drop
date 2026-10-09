@@ -68,27 +68,29 @@ async function authenticate(req, res, next) {
 
     const tgIdStr = String(telegramUser.id);
     let user = await db.queryOne('SELECT * FROM users WHERE telegram_id = ?', [tgIdStr]);
+    let isReferralBonusGiven = false;
+    const startParam = req.headers['x-start-param'] || '';
 
     if (!user) {
-      // Проверка реферального кода: ref_{telegram_id}
       let referrerId = null;
       let startCoins = 250;
-      const startParam = req.headers['x-start-param'] || '';
 
       if (startParam.startsWith('ref_')) {
-        const refTgId = startParam.replace('ref_', '').trim();
-        if (refTgId && refTgId !== tgIdStr) {
-          const referrer = await db.queryOne('SELECT id, telegram_id FROM users WHERE telegram_id = ?', [refTgId]);
-          if (referrer) {
-            referrerId = referrer.id;
-            startCoins = 350; // +100 Coins бонус новичку
+        const refIdStr = startParam.replace('ref_', '').trim();
+        const referrer = await db.queryOne(
+          'SELECT id, telegram_id FROM users WHERE telegram_id = ? OR id = ?',
+          [refIdStr, Number(refIdStr) || 0]
+        );
+        if (referrer && String(referrer.telegram_id) !== tgIdStr && String(referrer.id) !== tgIdStr) {
+          referrerId = referrer.id;
+          startCoins = 350; // +100 Coins бонус новичку
+          isReferralBonusGiven = true;
 
-            // Начисляем рефереру +150 Coins
-            await db.run(
-              'UPDATE users SET coins = coins + 150, referral_earnings = referral_earnings + 150 WHERE id = ?',
-              [referrer.id]
-            );
-          }
+          // Начисляем рефереру +150 Coins
+          await db.run(
+            'UPDATE users SET coins = coins + 150, referral_earnings = referral_earnings + 150 WHERE id = ?',
+            [referrer.id]
+          );
         }
       }
 
@@ -108,9 +110,26 @@ async function authenticate(req, res, next) {
           );
         } catch {}
       }
+    } else if (!user.referrer_id && startParam.startsWith('ref_')) {
+      // Игрок уже запускал бота ранее, но еще не был ни к кому привязан и перешел по ссылке друга
+      const refIdStr = startParam.replace('ref_', '').trim();
+      const referrer = await db.queryOne(
+        'SELECT id, telegram_id FROM users WHERE telegram_id = ? OR id = ?',
+        [refIdStr, Number(refIdStr) || 0]
+      );
+      if (referrer && String(referrer.id) !== String(user.id) && String(referrer.telegram_id) !== tgIdStr) {
+        await db.run('UPDATE users SET coins = coins + 100, referrer_id = ? WHERE id = ?', [referrer.id, user.id]);
+        await db.run('UPDATE users SET coins = coins + 150, referral_earnings = referral_earnings + 150 WHERE id = ?', [referrer.id]);
+        try {
+          await db.run('INSERT INTO referrals (referrer_id, referred_id, bonus_coins) VALUES (?, ?, 150)', [referrer.id, user.id]);
+        } catch {}
+        user = await db.queryOne('SELECT * FROM users WHERE id = ?', [user.id]);
+        isReferralBonusGiven = true;
+      }
     }
 
     req.user = user;
+    req.isReferralBonusGiven = isReferralBonusGiven;
     next();
   } catch (err) {
     console.error('[Auth Middleware Error]:', err);
@@ -123,7 +142,11 @@ async function authenticate(req, res, next) {
  * ------------------------------------------------------------- */
 
 router.post('/auth', authenticate, async (req, res) => {
-  res.json({ success: true, user: req.user });
+  res.json({
+    success: true,
+    user: req.user,
+    referralBonus: req.isReferralBonusGiven
+  });
 });
 
 router.get('/user/profile', authenticate, async (req, res) => {

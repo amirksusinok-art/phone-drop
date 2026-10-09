@@ -23,9 +23,11 @@ export default function Navbar({ user, onWarningClick, onReloadUser, onOpenStati
       <div className="max-w-md mx-auto flex items-center justify-between">
         {/* Логотип и имя пользователя */}
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-sm">
-            📱
-          </div>
+          <img
+            src="/app_icon.jpg"
+            alt="Phone Drop"
+            className="w-8 h-8 rounded-xl object-cover border border-white/10 shadow-sm"
+          />
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold tracking-tight text-[var(--tg-theme-text-color,#f8fafc)] text-sm">

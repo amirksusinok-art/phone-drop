@@ -64,6 +64,13 @@ export default function App() {
 
       const res = await api.auth();
       setUser(res.user);
+
+      if (res.referralBonus) {
+        setTimeout(() => {
+          haptic.notification('success');
+          showToast('🎁 Приглашение активировано! Тебе начислено +100 Coins!', 'success');
+        }, 500);
+      }
     } catch (err) {
       console.error('[App Init Error]:', err);
     } finally {
