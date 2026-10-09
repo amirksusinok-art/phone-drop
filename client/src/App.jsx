@@ -9,6 +9,7 @@ import PhoneDetailModal from './components/PhoneDetailModal';
 import SellSystemModal from './components/SellSystemModal';
 import ListMarketModal from './components/ListMarketModal';
 import ExpandInventoryModal from './components/ExpandInventoryModal';
+import StationSheet from './components/StationSheet';
 
 import InventoryView from './views/InventoryView';
 import DropView from './views/DropView';
@@ -24,6 +25,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('inventory');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [stationOpen, setStationOpen] = useState(false);
 
   // Тост-уведомления
   const [toast, setToast] = useState(null);
@@ -154,6 +156,7 @@ export default function App() {
         user={user}
         onWarningClick={() => setWarningOpen(true)}
         onReloadUser={reloadUser}
+        onOpenStation={() => setStationOpen(true)}
       />
 
       {/* Основной контент вкладки */}
@@ -180,6 +183,7 @@ export default function App() {
                 onUpdateUser={reloadUser}
                 onEquipPhone={handleEquipPhone}
                 onOpenDetails={(id) => setDetailPhoneId(id)}
+                onOpenStation={() => setStationOpen(true)}
                 showToast={showToast}
               />
             )}
@@ -262,6 +266,14 @@ export default function App() {
         isOpen={expandModalOpen}
         onClose={() => setExpandModalOpen(false)}
         onConfirm={handleConfirmExpandInventory}
+      />
+
+      {/* Шторка станции связи (кликер) */}
+      <StationSheet
+        isOpen={stationOpen}
+        onClose={() => setStationOpen(false)}
+        onUpdateUser={reloadUser}
+        showToast={showToast}
       />
     </div>
   );

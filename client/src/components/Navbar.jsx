@@ -1,10 +1,10 @@
 // client/src/components/Navbar.jsx
 import React from 'react';
-import { Coins, ShieldAlert, Users } from 'lucide-react';
+import { Coins, ShieldAlert, Users, Radio } from 'lucide-react';
 import { getDemoUser, setDemoUser } from '../api';
 import { haptic } from '../haptic';
 
-export default function Navbar({ user, onWarningClick, onReloadUser }) {
+export default function Navbar({ user, onWarningClick, onReloadUser, onOpenStation }) {
   const isInsideTelegram = Boolean(window.Telegram?.WebApp?.initData);
 
   const toggleDemoAccount = () => {
@@ -50,6 +50,18 @@ export default function Navbar({ user, onWarningClick, onReloadUser }) {
               {Number(user?.coins || 0).toLocaleString()}
             </span>
           </div>
+
+          {/* Кнопка станции связи (кликер) */}
+          <button
+            onClick={() => {
+              haptic.selection();
+              onOpenStation?.();
+            }}
+            className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-sky-400 border border-white/5 transition active:scale-[0.95]"
+            title="Станция связи"
+          >
+            <Radio className="w-4 h-4" />
+          </button>
 
           {/* Предупреждение о правилах */}
           <button

@@ -1135,4 +1135,130 @@ router.post('/stars/buy', authenticate, async (req, res) => {
   });
 });
 
+/* -------------------------------------------------------------
+ * 13. СИГНАЛ СЕТИ (ПАССИВНЫЙ ДОХОД) И ПИНГ СТАНЦИИ (КЛИКЕР)
+ * ------------------------------------------------------------- */
+const PASSIVE_RATES = {
+  common: 5,
+  uncommon: 10,
+  rare: 20,
+  epic: 35,
+  legendary: 50,
+  mythic: 80
+};
+
+router.get('/signal/status', authenticate, async (req, res) => {
+  const user = await db.queryOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  
+  let ratePerHour = 3;
+  let equippedPhone = null;
+
+  if (user.equipped_phone_id) {
+    equippedPhone = await db.queryOne('SELECT * FROM phones WHERE id = ?', [user.equipped_phone_id]);
+    if (equippedPhone && PASSIVE_RATES[equippedPhone.rarity]) {
+      ratePerHour = PASSIVE_RATES[equippedPhone.rarity];
+    }
+  }
+
+  const now = Date.now();
+  const lastClaim = user.last_signal_claim ? new Date(user.last_signal_claim).getTime() : now;
+  const elapsedHours = Math.max(0, (now - lastClaim) / (3600 * 1000));
+  const cappedHours = Math.min(8, elapsedHours);
+  const uncollectedCoins = Math.floor(cappedHours * ratePerHour);
+  const progressPercent = Math.min(100, Math.round((elapsedHours / 8) * 100));
+
+  const lastEnergy = user.last_energy_update ? new Date(user.last_energy_update).getTime() : now;
+  const elapsedSeconds = Math.max(0, (now - lastEnergy) / 1000);
+  const recoveredEnergy = Math.floor(elapsedSeconds / 3);
+  const currentEnergy = Math.min(250, (user.energy !== null && user.energy !== undefined ? user.energy : 250) + recoveredEnergy);
+
+  res.json({
+    ratePerHour,
+    uncollectedCoins,
+    maxCapCoins: ratePerHour * 8,
+    progressPercent,
+    currentEnergy,
+    maxEnergy: 250,
+    equippedPhone
+  });
+});
+
+router.post('/signal/claim', authenticate, async (req, res) => {
+  const user = await db.queryOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  
+  let ratePerHour = 3;
+  if (user.equipped_phone_id) {
+    const phone = await db.queryOne('SELECT * FROM phones WHERE id = ?', [user.equipped_phone_id]);
+    if (phone && PASSIVE_RATES[phone.rarity]) {
+      ratePerHour = PASSIVE_RATES[phone.rarity];
+    }
+  }
+
+  const now = Date.now();
+  const lastClaim = user.last_signal_claim ? new Date(user.last_signal_claim).getTime() : now;
+  const elapsedHours = Math.max(0, (now - lastClaim) / (3600 * 1000));
+  const cappedHours = Math.min(8, elapsedHours);
+  const uncollectedCoins = Math.floor(cappedHours * ratePerHour);
+
+  if (uncollectedCoins <= 0) {
+    return res.status(400).json({ error: 'Сигнал еще накапливается! Подождите немного.' });
+  }
+
+  if (db.isPostgres) {
+    await db.run('UPDATE users SET coins = coins + ?, last_signal_claim = NOW() WHERE id = ?', [uncollectedCoins, user.id]);
+  } else {
+    await db.run('UPDATE users SET coins = coins + ?, last_signal_claim = CURRENT_TIMESTAMP WHERE id = ?', [uncollectedCoins, user.id]);
+  }
+
+  const freshUser = await db.queryOne('SELECT coins FROM users WHERE id = ?', [user.id]);
+
+  res.json({
+    success: true,
+    claimedCoins: uncollectedCoins,
+    newBalance: freshUser.coins
+  });
+});
+
+router.post('/signal/tap', authenticate, async (req, res) => {
+  const { count, luckyHits = 0 } = req.body;
+  const user = await db.queryOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
+
+  const tapCount = Math.floor(Number(count) || 0);
+  const lucky = Math.floor(Number(luckyHits) || 0);
+
+  if (tapCount <= 0 || tapCount > 250) {
+    return res.status(400).json({ error: 'Некорректное число тапов' });
+  }
+
+  const now = Date.now();
+  const lastEnergy = user.last_energy_update ? new Date(user.last_energy_update).getTime() : now;
+  const elapsedSeconds = Math.max(0, (now - lastEnergy) / 1000);
+  const recoveredEnergy = Math.floor(elapsedSeconds / 3);
+  const currentEnergy = Math.min(250, (user.energy !== null && user.energy !== undefined ? user.energy : 250) + recoveredEnergy);
+
+  if (tapCount > currentEnergy) {
+    return res.status(400).json({ error: 'Недостаточно энергии' });
+  }
+
+  const validatedLucky = Math.min(lucky, Math.max(1, Math.floor(tapCount * 0.1)));
+  const earnedCoins = tapCount * 1 + validatedLucky * 25;
+  const remainingEnergy = currentEnergy - tapCount;
+
+  if (db.isPostgres) {
+    await db.run('UPDATE users SET coins = coins + ?, energy = ?, last_energy_update = NOW() WHERE id = ?', [earnedCoins, remainingEnergy, user.id]);
+  } else {
+    await db.run('UPDATE users SET coins = coins + ?, energy = ?, last_energy_update = CURRENT_TIMESTAMP WHERE id = ?', [earnedCoins, remainingEnergy, user.id]);
+  }
+
+  const freshUser = await db.queryOne('SELECT coins, energy FROM users WHERE id = ?', [user.id]);
+
+  res.json({
+    success: true,
+    earnedCoins,
+    newBalance: freshUser.coins,
+    remainingEnergy: freshUser.energy
+  });
+});
+
 module.exports = router;
+

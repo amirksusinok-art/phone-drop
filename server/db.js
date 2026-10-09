@@ -83,6 +83,9 @@ async function initSchema() {
       profile_bg TEXT NOT NULL DEFAULT 'default',
       referrer_id INTEGER,
       referral_earnings INTEGER NOT NULL DEFAULT 0,
+      last_signal_claim ${isPg ? 'TIMESTAMPTZ DEFAULT NOW()' : 'DATETIME DEFAULT CURRENT_TIMESTAMP'},
+      energy INTEGER NOT NULL DEFAULT 250,
+      last_energy_update ${isPg ? 'TIMESTAMPTZ DEFAULT NOW()' : 'DATETIME DEFAULT CURRENT_TIMESTAMP'},
       is_public INTEGER NOT NULL DEFAULT 1,
       created_at ${isPg ? 'TIMESTAMPTZ DEFAULT NOW()' : 'DATETIME DEFAULT CURRENT_TIMESTAMP'}
     )
@@ -187,6 +190,12 @@ async function initSchema() {
     await pgPool.query(createReferralsTable);
     await pgPool.query(createStarsOrdersTable);
     await pgPool.query(createOperationsLogTable);
+
+    try { await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS referrer_id INTEGER'); } catch {}
+    try { await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_earnings INTEGER NOT NULL DEFAULT 0'); } catch {}
+    try { await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_signal_claim TIMESTAMPTZ DEFAULT NOW()'); } catch {}
+    try { await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS energy INTEGER NOT NULL DEFAULT 250'); } catch {}
+    try { await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_energy_update TIMESTAMPTZ DEFAULT NOW()'); } catch {}
   } else {
     sqliteDb.exec(createUsersTable);
     sqliteDb.exec(createPhonesTable);
@@ -198,12 +207,11 @@ async function initSchema() {
     sqliteDb.exec(createOperationsLogTable);
 
     // Добавляем недостающие колонки в существующие таблицы, если база уже создана
-    try {
-      sqliteDb.exec('ALTER TABLE users ADD COLUMN referrer_id INTEGER');
-    } catch {}
-    try {
-      sqliteDb.exec('ALTER TABLE users ADD COLUMN referral_earnings INTEGER NOT NULL DEFAULT 0');
-    } catch {}
+    try { sqliteDb.exec('ALTER TABLE users ADD COLUMN referrer_id INTEGER'); } catch {}
+    try { sqliteDb.exec('ALTER TABLE users ADD COLUMN referral_earnings INTEGER NOT NULL DEFAULT 0'); } catch {}
+    try { sqliteDb.exec('ALTER TABLE users ADD COLUMN last_signal_claim DATETIME DEFAULT CURRENT_TIMESTAMP'); } catch {}
+    try { sqliteDb.exec('ALTER TABLE users ADD COLUMN energy INTEGER NOT NULL DEFAULT 250'); } catch {}
+    try { sqliteDb.exec('ALTER TABLE users ADD COLUMN last_energy_update DATETIME DEFAULT CURRENT_TIMESTAMP'); } catch {}
   }
 
   console.log('[DB] Структура базы данных проверена и готова.');

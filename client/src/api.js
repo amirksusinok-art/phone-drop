@@ -88,6 +88,11 @@ export const api = {
   getStarsPackages: () => apiRequest('/stars/packages'),
   buyStars: (packageId) => apiRequest('/stars/buy', { method: 'POST', body: JSON.stringify({ packageId }) }),
 
+  // Сигнал сети (пассивный доход) и Станция связи (кликер)
+  getSignalStatus: () => apiRequest('/signal/status'),
+  claimSignal: () => apiRequest('/signal/claim', { method: 'POST' }),
+  tapStation: (count, luckyHits) => apiRequest('/signal/tap', { method: 'POST', body: JSON.stringify({ count, luckyHits }) }),
+
   // Кейсы
   getCasesInfo: () => apiRequest('/cases/info'),
   openCase: (caseType, country = null, opKey = null) =>
