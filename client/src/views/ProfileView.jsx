@@ -169,6 +169,19 @@ export default function ProfileView({
             </div>
             <span className="text-amber-400">➔</span>
           </button>
+
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-between transition"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-base">📜</span>
+              <span>Политика конфиденциальности (RU / EN)</span>
+            </div>
+            <span className="text-slate-400">➔</span>
+          </a>
         </div>
       )}
 
