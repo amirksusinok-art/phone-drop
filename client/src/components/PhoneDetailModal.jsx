@@ -1,7 +1,7 @@
 // client/src/components/PhoneDetailModal.jsx
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Coins, Tag, History, Check } from 'lucide-react';
-import { RARITIES_CONFIG } from './PhoneCard';
+import { RARITIES_CONFIG, COUNTRY_META } from './PhoneCard';
 import { api } from '../api';
 import { haptic } from '../haptic';
 
@@ -32,6 +32,7 @@ export default function PhoneDetailModal({
   const phone = details?.phone;
   const rarity = phone?.rarity || 'common';
   const rConfig = RARITIES_CONFIG[rarity] || RARITIES_CONFIG.common;
+  const meta = COUNTRY_META[phone?.country] || { name: phone?.country || 'Глобальный', flag: '🌐' };
   const isOwner = phone && Number(phone.owner_id) === Number(currentUserId);
   const isEquipped = phone && Number(phone.id) === Number(equippedPhoneId);
 
@@ -62,7 +63,9 @@ export default function PhoneDetailModal({
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${rConfig.badgeClass}`}>
               {rConfig.name}
             </span>
-            <span className="text-xs text-[var(--tg-theme-hint-color,#94a3b8)]">Серия {phone?.series || '2026'}</span>
+            <span className="text-xs text-[var(--tg-theme-hint-color,#94a3b8)]">
+              {meta.flag} {meta.name} • Серия {phone?.series || '2026'}
+            </span>
           </div>
 
           <div className="font-number text-xl font-bold text-white tracking-tight my-1">

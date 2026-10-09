@@ -11,12 +11,12 @@ export const RARITIES_CONFIG = {
   mythic: { name: 'Мифический', badgeClass: 'rarity-mythic' }
 };
 
-const COUNTRY_FLAGS = {
-  RU: '🇷🇺',
-  UA: '🇺🇦',
-  US: '🇺🇸',
-  TR: '🇹🇷',
-  CN: '🇨🇳'
+export const COUNTRY_META = {
+  RU: { name: 'Россия', flag: '🇷🇺', prefix: '+7' },
+  UA: { name: 'Украина', flag: '🇺🇦', prefix: '+380' },
+  US: { name: 'США', flag: '🇺🇸', prefix: '+1' },
+  TR: { name: 'Турция', flag: '🇹🇷', prefix: '+90' },
+  CN: { name: 'Китай', flag: '🇨🇳', prefix: '+86' }
 };
 
 export default function PhoneCard({
@@ -29,7 +29,7 @@ export default function PhoneCard({
 }) {
   const rarity = phone?.rarity || 'common';
   const rConfig = RARITIES_CONFIG[rarity] || RARITIES_CONFIG.common;
-  const flag = COUNTRY_FLAGS[phone?.country] || '🌐';
+  const meta = COUNTRY_META[phone?.country] || { name: phone?.country || 'Глобальный', flag: '🌐' };
 
   return (
     <div
@@ -43,8 +43,8 @@ export default function PhoneCard({
       {/* Верхняя строка: флаг, страна, редкость, очки */}
       <div className="flex items-center justify-between text-xs mb-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-base">{flag}</span>
-          <span className="text-[11px] font-medium text-slate-400">{phone.country}</span>
+          <span className="text-sm">{meta.flag}</span>
+          <span className="text-[11px] font-medium text-slate-300">{meta.name}</span>
           <span className="text-[10px] text-slate-500 font-mono">#{phone.id}</span>
         </div>
 
